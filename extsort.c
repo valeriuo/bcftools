@@ -3,17 +3,17 @@
    Copyright (C) 2020 Genome Research Ltd.
 
    Author: Petr Danecek <pd3@sanger.ac.uk>
-   
+
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
    in the Software without restriction, including without limitation the rights
    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
    copies of the Software, and to permit persons to whom the Software is
    furnished to do so, subject to the following conditions:
-   
+
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
-   
+
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -73,28 +73,24 @@ size_t parse_mem_string(const char *str);
 
 static void _init_tmp_prefix(extsort_t *es, const char *tmp_prefix)
 {
-    if ( tmp_prefix )
-    {
-        int len = strlen(tmp_prefix);
-        es->tmp_prefix = (char*) calloc(len+7,1);
-        memcpy(es->tmp_prefix,tmp_prefix,len);
-        memcpy(es->tmp_prefix+len,"XXXXXX",6);
-    }
-    else
-    {
-        #ifdef _WIN32
-            char tmp_path[MAX_PATH];
-            int ret = GetTempPath(MAX_PATH, tmp_path);
-            if (!ret || ret > MAX_PATH)
-                error("Could not get the path to the temporary folder\n");
-            if (strlen(tmp_path) + strlen("/bcftools-sort.XXXXXX") >= MAX_PATH)
-                error("Full path to the temporary folder is too long\n");
-            strcat(tmp_path, "/bcftools-sort.XXXXXX");
-            es->tmp_prefix = strdup(tmp_path);
-        #else
-            es->tmp_prefix = strdup("/tmp/bcftools-sort.XXXXXX");
-        #endif
-    }
+    if ( !tmp_prefix )
+        tmp_prefix = "bcftools-extsort";
+
+#ifdef _WIN32
+    char tmp_path[MAX_PATH];
+    int ret = GetTempPath(MAX_PATH, tmp_path);
+    if (!ret || ret > MAX_PATH)
+        error("Could not get the path to the temporary folder\n");
+    if (strlen(tmp_path) + +strlen(tmp_prefix) + strlen("/.XXXXXX") >= MAX_PATH)
+        error("Full path to the temporary folder is too long\n");
+    snprintf(tmp_path+ret, MAX_PATH-ret, "/%s.XXXXXX", tmp_prefix);
+#else
+    char tmp_path[FILENAME_MAX];
+    snprintf(tmp_path, FILENAME_MAX, "/tmp/%s.XXXXXX", tmp_prefix);
+#endif
+    es->tmp_prefix = strdup(tmp_path);
+    if (!es->tmp_prefix)
+        error("Could not create temporary filename\n");
 }
 
 void extsort_set(extsort_t *es, extsort_opt_t key, void *value)
@@ -164,9 +160,10 @@ static void _buf_flush(extsort_t *es)
             blk->fd = _open(blk->fname, O_RDWR|O_CREAT|O_EXCL|O_BINARY|O_TEMPORARY, 0600);
             if ( blk->fd==-1 )
             {
-                if ( errno==EEXIST ) continue; 
+                if ( errno==EEXIST ) continue;
                 error("Error: failed to open a temporary file %s\n",blk->fname);
             }
+            break;
         }
         if ( !blk->fd ) error("Error: failed to create a unique temporary file name from %s\n",es->tmp_prefix);
         if ( _chmod(blk->fname, S_IRUSR|S_IWUSR)!=0 ) error("Error: failed to set permissions of the temporary file %s\n",blk->fname);
@@ -179,7 +176,13 @@ static void _buf_flush(extsort_t *es)
 
     for (i=0; i<es->nbuf; i++)
     {
-        if ( write(blk->fd, es->buf[i], es->dat_size)!=es->dat_size ) error("Error: failed to write %zu bytes to the temporary file %s\n",es->dat_size,blk->fname);
+#ifdef _WIN32
+        if ( _write(blk->fd, es->buf[i], es->dat_size)!=es->dat_size )
+#else
+        if ( write(blk->fd, es->buf[i], es->dat_size)!=es->dat_size )
+#endif
+            error_errno("Error: failed to write %zu bytes to the temporary file %s\n",es->dat_size,blk->fname);
+
         free(es->buf[i]);
     }
     if ( lseek(blk->fd,0,SEEK_SET)!=0 ) error("Error: failed to lseek() to the start of the temporary file %s\n", blk->fname);

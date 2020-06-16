@@ -177,7 +177,7 @@ static inline void diff_sites_reset(args_t *args)
 {
     kbs_clear(args->kbs_diff);
 }
-/* 
+/*
     Generage a 32-bit random number, taken from
         https://www.pcg-random.org/download.html#minimal-c-implementation
 */
@@ -378,7 +378,7 @@ static void init_data(args_t *args)
         args->gt_prob  = args->cross_check ? args->qry_prob : (double*) malloc(3*args->ngt_smpl*sizeof(*args->gt_prob));
 
         // dsg2prob: the first index is bitmask of 8 possible dsg combinations (only 1<<0,1<<2,1<<3 are set, accessing
-        // anything else indicated an error, this is just to reuse gt_to_dsg()); the second index are the corresponding 
+        // anything else indicated an error, this is just to reuse gt_to_dsg()); the second index are the corresponding
         // probabilities of 0/0, 0/1, and 1/1 genotypes
         for (i=0; i<8; i++)
             for (j=0; j<3; j++)
@@ -602,7 +602,7 @@ static void process_line(args_t *args)
                 gt_dsg = args->gt_use_GT ? gt_to_prob(args,ptr,gt_prob) : pl_to_prob(args,ptr,gt_prob);
                 if ( !gt_dsg ) continue;                        // missing value
                 if ( args->hom_only && !(gt_dsg&5) ) continue;  // not a hom
-               
+
                 ptr = args->qry_arr + args->pairs[i].iqry*nqry1;
                 qry_dsg = args->qry_use_GT ? gt_to_prob(args,ptr,qry_prob) : pl_to_prob(args,ptr,qry_prob);
                 if ( !qry_dsg ) continue;                       // missing value
@@ -995,11 +995,11 @@ int main_vcfgtcheck(int argc, char *argv[])
     args->use_PLs = 40;
 
     // external sort for --distinctive-sites
-    args->es_tmp_prefix = "/tmp/bcftools-gtcheck";
+    args->es_tmp_prefix = "bcftools-gtcheck";
     args->es_max_mem = strdup("500M");
 
     // In simulated sample swaps the minimum error was 0.3 and maximum intra-sample error was 0.23
-    //    - min_inter: pairs with smaller err value will be considered identical 
+    //    - min_inter: pairs with smaller err value will be considered identical
     //    - max_intra: pairs with err value bigger than abs(max_intra_err) will be considered
     //                  different. If negative, the cutoff may be heuristically lowered
     args->min_inter_err =  0.23;
@@ -1069,7 +1069,7 @@ int main_vcfgtcheck(int argc, char *argv[])
             case 3 : args->calc_hwe_prob = 0; break;
             case 4 : error("The option -S, --target-sample has been deprecated\n"); break;
             case 5 : args->dry_run = 1; break;
-            case 6 : 
+            case 6 :
                 args->distinctive_sites = strtod(optarg,&tmp);
                 if ( *tmp )
                 {
@@ -1101,7 +1101,7 @@ int main_vcfgtcheck(int argc, char *argv[])
                 else if ( !strncasecmp("qry:",optarg,4) ) args->qry_samples = optarg+4;
                 else error("Which one? Query samples (qry:%s) or genotype samples (gt:%s)?\n",optarg,optarg);
                 break;
-            case 'S': 
+            case 'S':
                 if ( !strncasecmp("gt:",optarg,3) ) args->gt_samples = optarg+3, args->gt_samples_is_file = 1;
                 else if ( !strncasecmp("qry:",optarg,4) ) args->qry_samples = optarg+4, args->qry_samples_is_file = 1;
                 else error("Which one? Query samples (qry:%s) or genotype samples (gt:%s)?\n",optarg,optarg);
