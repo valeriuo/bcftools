@@ -282,7 +282,7 @@ static void group_smpl(mplp_pileup_t *m, bam_smpl_t *bsmpl, int n, int *n_plp, c
         {
             const bam_pileup1_t *p = plp[i] + j;
             int id = PLP_SAMPLE_ID(p->cd.i);
-            if (m->n_plp[id] == m->m_plp[id]) 
+            if (m->n_plp[id] == m->m_plp[id])
             {
                 m->m_plp[id] = m->m_plp[id]? m->m_plp[id]<<1 : 8;
                 m->plp[id] = (bam_pileup1_t*) realloc(m->plp[id], sizeof(bam_pileup1_t) * m->m_plp[id]);
@@ -324,7 +324,7 @@ static int mpileup_reg(mplp_conf_t *conf, uint32_t beg, uint32_t end)
     int ret, i, tid, pos, ref_len;
     char *ref;
 
-    while ( (ret=bam_mplp_auto(conf->iter, &tid, &pos, conf->n_plp, conf->plp)) > 0) 
+    while ( (ret=bam_mplp_auto(conf->iter, &tid, &pos, conf->n_plp, conf->plp)) > 0)
     {
         if ( pos<beg || pos>end ) continue;
         if ( conf->bed && tid >= 0 )
@@ -351,13 +351,13 @@ static int mpileup_reg(mplp_conf_t *conf, uint32_t beg, uint32_t end)
 
         // call indels; todo: subsampling with total_depth>max_indel_depth instead of ignoring?
         // check me: rghash in bcf_call_gap_prep() should have no effect, reads mplp_func already excludes them
-        if (!(conf->flag&MPLP_NO_INDEL) && total_depth < conf->max_indel_depth 
+        if (!(conf->flag&MPLP_NO_INDEL) && total_depth < conf->max_indel_depth
             && bcf_call_gap_prep(conf->gplp->n, conf->gplp->n_plp, conf->gplp->plp, pos, conf->bca, ref) >= 0)
         {
             bcf_callaux_clean(conf->bca, &conf->bc);
             for (i = 0; i < conf->gplp->n; ++i)
                 bcf_call_glfgen(conf->gplp->n_plp[i], conf->gplp->plp[i], -1, conf->bca, conf->bcr + i);
-            if (bcf_call_combine(conf->gplp->n, conf->bcr, conf->bca, -1, &conf->bc) >= 0) 
+            if (bcf_call_combine(conf->gplp->n, conf->bcr, conf->bca, -1, &conf->bc) >= 0)
             {
                 bcf_clear1(conf->bcf_rec);
                 bcf_call2bcf(&conf->bc, conf->bcf_rec, conf->bcr, conf->fmt_flag, conf->bca, ref);
@@ -438,20 +438,23 @@ static int mpileup(mplp_conf_t *conf)
             fprintf(stderr,"[%s] fail to read the header of %s\n", __func__, conf->files[i]);
             exit(EXIT_FAILURE);
         }
-        conf->mplp_data[i]->h = i ? hdr : h_tmp; // for j==0, "h" has not been set yet
+        /* save the header of first file in list */
+        if ( !i ) hdr = h_tmp;
+        conf->mplp_data[i]->h = hdr;
         conf->mplp_data[i]->bam_id = bam_smpl_add_bam(conf->bsmpl,h_tmp->text,conf->files[i]);
+        if ( i>0 ) bam_hdr_destroy(h_tmp);
         if ( conf->mplp_data[i]->bam_id<0 )
         {
             // no usable readgroups in this bam, it can be skipped
             sam_close(conf->mplp_data[i]->fp);
             free(conf->mplp_data[i]);
-            bam_hdr_destroy(h_tmp);
             free(conf->files[i]);
             if ( i+1<conf->nfiles ) memmove(&conf->files[i],&conf->files[i+1],sizeof(*conf->files)*(conf->nfiles-i-1));
             conf->nfiles--;
             i--;
             continue;
         }
+
         if (conf->reg) {
             hts_idx_t *idx = sam_index_load(conf->mplp_data[i]->fp, conf->files[i]);
             if (idx == NULL) {
@@ -461,7 +464,7 @@ static int mpileup(mplp_conf_t *conf)
             conf->buf.l = 0;
             ksprintf(&conf->buf,"%s:%u-%u",conf->reg_itr->seq,conf->reg_itr->beg+1,conf->reg_itr->end+1);
             conf->mplp_data[i]->iter = sam_itr_querys(idx, conf->mplp_data[i]->h, conf->buf.s);
-            if ( !conf->mplp_data[i]->iter ) 
+            if ( !conf->mplp_data[i]->iter )
             {
                 conf->mplp_data[i]->iter = sam_itr_querys(idx, conf->mplp_data[i]->h, conf->reg_itr->seq);
                 if ( conf->mplp_data[i]->iter ) {
@@ -476,22 +479,12 @@ static int mpileup(mplp_conf_t *conf)
             else
                 conf->mplp_data[i]->idx = idx;
         }
-
-        if ( !hdr ) hdr = h_tmp; /* save the header of first file in list */
-        else {
-            // FIXME: check consistency between h and h_tmp
-            bam_hdr_destroy(h_tmp);
-
-            // we store only the first file's header; it's (alleged to be)
-            // compatible with the i-th file's target_name lookup needs
-            conf->mplp_data[i]->h = hdr;
-        }
     }
     // allocate data storage proportionate to number of samples being studied sm->n
     bam_smpl_get_samples(conf->bsmpl, &conf->gplp->n);
     conf->gplp->n_plp = (int*) calloc(conf->gplp->n, sizeof(int));
     conf->gplp->m_plp = (int*) calloc(conf->gplp->n, sizeof(int));
-    conf->gplp->plp = (bam_pileup1_t**) calloc(conf->gplp->n, sizeof(bam_pileup1_t*));  
+    conf->gplp->plp = (bam_pileup1_t**) calloc(conf->gplp->n, sizeof(bam_pileup1_t*));
 
     fprintf(stderr, "[%s] %d samples in %d input files\n", __func__, conf->gplp->n, conf->nfiles);
     // write the VCF header
@@ -643,7 +636,7 @@ static int mpileup(mplp_conf_t *conf)
     if ( nregs )
     {
         int ireg = 0;
-        do 
+        do
         {
             // first region is already positioned
             if ( ireg++ > 0 )
@@ -651,11 +644,11 @@ static int mpileup(mplp_conf_t *conf)
                 conf->buf.l = 0;
                 ksprintf(&conf->buf,"%s:%u-%u",conf->reg_itr->seq,conf->reg_itr->beg+1,conf->reg_itr->end+1);
 
-                for (i=0; i<conf->nfiles; i++) 
+                for (i=0; i<conf->nfiles; i++)
                 {
                     hts_itr_destroy(conf->mplp_data[i]->iter);
                     conf->mplp_data[i]->iter = sam_itr_querys(conf->mplp_data[i]->idx, conf->mplp_data[i]->h, conf->buf.s);
-                    if ( !conf->mplp_data[i]->iter ) 
+                    if ( !conf->mplp_data[i]->iter )
                     {
                         conf->mplp_data[i]->iter = sam_itr_querys(conf->mplp_data[i]->idx, conf->mplp_data[i]->h, conf->reg_itr->seq);
                         if ( conf->mplp_data[i]->iter ) {
@@ -1045,13 +1038,13 @@ int bam_mpileup(int argc, char *argv[])
         case '6': mplp.flag |= MPLP_ILLUMINA13; break;
         case 's': if ( bam_smpl_add_samples(mplp.bsmpl,optarg,0)<0 ) error("Could not read samples: %s\n",optarg); break;
         case 'S': if ( bam_smpl_add_samples(mplp.bsmpl,optarg,1)<0 ) error("Could not read samples: %s\n",optarg); break;
-        case 'O': 
+        case 'O':
             switch (optarg[0]) {
                 case 'b': mplp.output_type = FT_BCF_GZ; break;
                 case 'u': mplp.output_type = FT_BCF; break;
                 case 'z': mplp.output_type = FT_VCF_GZ; break;
                 case 'v': mplp.output_type = FT_VCF; break;
-                default: error("[error] The option \"-O\" changed meaning when mpileup moved to bcftools. Did you mean: \"bcftools mpileup --output-type\" or \"samtools mpileup --output-BP\"?\n"); 
+                default: error("[error] The option \"-O\" changed meaning when mpileup moved to bcftools. Did you mean: \"bcftools mpileup --output-type\" or \"samtools mpileup --output-BP\"?\n");
             }
             break;
         case 'C': mplp.capQ_thres = atoi(optarg); break;
@@ -1120,7 +1113,7 @@ int bam_mpileup(int argc, char *argv[])
         return 1;
     }
     int ret,i;
-    if (file_list) 
+    if (file_list)
     {
         if ( read_file_list(file_list,&nfiles,&fn) ) return 1;
         mplp.files  = fn;
