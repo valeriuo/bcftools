@@ -258,7 +258,7 @@ static void phased_flush(args_t *args)
         bcf1_t *brec = args->buf[i+1];
 
         int nGTs = bcf_get_genotypes(ahdr, arec, &args->GTa, &args->mGTa);
-        if ( nGTs < 0 ) 
+        if ( nGTs < 0 )
         {
             if ( !gt_absent_warned )
             {
@@ -345,7 +345,7 @@ static void phased_flush(args_t *args)
             bcf_update_format_int32(args->out_hdr,brec,"PQ",args->phase_qual,nsmpl);
             PQ_printed = 1;
             for (j=0; j<nsmpl; j++)
-                if ( args->phase_qual[j] < args->min_PQ ) 
+                if ( args->phase_qual[j] < args->min_PQ )
                 {
                     args->phase_set[j] = brec->pos+1;
                     args->phase_set_changed = 1;
@@ -531,7 +531,7 @@ static void concat(args_t *args)
     else    // concatenating
     {
         struct timeval t0, t1;
-        kstring_t tmp = {0,0,0};
+        kstring_t tmp = KS_INITIALIZE;
         int prev_chr_id = -1, prev_pos;
         bcf1_t *line = bcf_init();
         for (i=0; i<args->nfnames; i++)
@@ -547,13 +547,14 @@ static void concat(args_t *args)
             if ( !fp->is_bin && args->output_type&FT_VCF )
             {
                 line->max_unpack = BCF_UN_STR;
+                kstring_t ks_line = KS_INITIALIZE;
                 // if VCF is on both input and output, avoid VCF to BCF conversion
-                while ( hts_getline(fp, KS_SEP_LINE, &fp->line) >=0 )
+                while ( hts_getline(fp, KS_SEP_LINE, &ks_line) >=0 )
                 {
-                    char *str = fp->line.s;
+                    char *str = ks_str(&ks_line);
                     while ( *str && *str!='\t' ) str++;
                     tmp.l = 0;
-                    kputsn(fp->line.s,str-fp->line.s,&tmp);
+                    kputsn(ks_line.s,str-ks_line.s,&tmp);
                     int chr_id = bcf_hdr_name2id(args->out_hdr, tmp.s);
                     if ( chr_id<0 ) error("\nThe sequence \"%s\" not defined in the header: %s\n(Quick workaround: index the file.)\n", tmp.s, args->fnames[i]);
                     if ( prev_chr_id!=chr_id )
@@ -564,14 +565,15 @@ static void concat(args_t *args)
                     }
                     char *end;
                     int pos = strtol(str+1,&end,10) - 1;
-                    if ( end==str+1 ) error("Could not parse line: %s\n", fp->line.s);
+                    if ( end==str+1 ) error("Could not parse line: %s\n", ks_str(&ks_line));
                     if ( prev_pos > pos )
                         error("\nThe chromosome block %s is not sorted, consider running with -a.\n", tmp.s);
                     args->seen_seq[chr_id] = 1;
                     prev_chr_id = chr_id;
 
-                    if ( vcf_write_line(args->out_fh, &fp->line)!=0 ) error("\nFailed to write %"PRIu64" bytes\n", (uint64_t)fp->line.l);
+                    if ( vcf_write_line(args->out_fh, &ks_line)!=0 ) error("\nFailed to write %"PRIu64" bytes\n", (uint64_t)ks_len(&ks_line));
                 }
+                ks_free(&ks_line);
             }
             else
             {
@@ -907,7 +909,7 @@ int main_vcfconcat(int argc, char *argv[])
             case 'R': args->regions_list = optarg; args->regions_is_file = 1; break;
             case 'd': args->remove_dups = optarg; break;
             case 'D': args->remove_dups = "exact"; break;
-            case 'q': 
+            case 'q':
                 args->min_PQ = strtol(optarg,&tmp,10);
                 if ( *tmp ) error("Could not parse argument: --min-PQ %s\n", optarg);
                 break;

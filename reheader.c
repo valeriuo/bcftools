@@ -441,13 +441,14 @@ static void reheader_vcf_gz(args_t *args)
 }
 static void reheader_vcf(args_t *args)
 {
-    kstring_t hdr = {0,0,0};
+    kstring_t hdr = KS_INITIALIZE;
+    kstring_t line  = KS_INITIALIZE;
     htsFile *fp = args->fp;
-    while ( hts_getline(fp, KS_SEP_LINE, &fp->line) >=0 )
+    while ( hts_getline(fp, KS_SEP_LINE, &line) >=0 )
     {
-        kputc('\n',&fp->line);  // hts_getline eats the newline character
-        if ( fp->line.s[0]!='#' ) break;
-        kputsn(fp->line.s,fp->line.l,&hdr);
+        kputc('\n',&line);  // hts_getline eats the newline character
+        if ( line.s[0]!='#' ) break;
+        kputsn(line.s,line.l,&hdr);
     }
 
     int nsamples = 0;
@@ -473,16 +474,17 @@ static void reheader_vcf(args_t *args)
     int out = args->output_fname ? open(args->output_fname, O_WRONLY|O_CREAT|O_TRUNC, 0666) : STDOUT_FILENO;
     if ( out==-1 ) error("%s: %s\n", args->output_fname,strerror(errno));
     if ( write(out, hdr.s, hdr.l)!=hdr.l ) error("Failed to write %"PRIu64" bytes\n", (uint64_t)hdr.l);
-    free(hdr.s);
-    if ( fp->line.l )
+    ks_free(&hdr);
+    if ( line.l )
     {
-        if ( write(out, fp->line.s, fp->line.l)!=fp->line.l ) error("Failed to write %"PRIu64" bytes\n", (uint64_t)fp->line.l);
+        if ( write(out, line.s, line.l)!=line.l ) error("Failed to write %"PRIu64" bytes\n", (uint64_t)line.l);
     }
-    while ( hts_getline(fp, KS_SEP_LINE, &fp->line) >=0 )   // uncompressed file implies small size, we don't worry about speed
+    while ( hts_getline(fp, KS_SEP_LINE, &line) >=0 )   // uncompressed file implies small size, we don't worry about speed
     {
-        kputc('\n',&fp->line);
-        if ( write(out, fp->line.s, fp->line.l)!=fp->line.l ) error("Failed to write %"PRIu64" bytes\n", (uint64_t)fp->line.l);
+        kputc('\n',&line);
+        if ( write(out, line.s, line.l)!=line.l ) error("Failed to write %"PRIu64" bytes\n", (uint64_t)line.l);
     }
+    ks_free(&line);
     if ( hts_close(fp)!=0 ) error("[%s] Error: close failed .. %s\n", __func__,args->fname);
     if ( close(out)!=0 ) error("[%s] Error: close failed .. %s\n", __func__,args->output_fname);
 }
@@ -678,7 +680,7 @@ int main_reheader(int argc, char *argv[])
     int c;
     args_t *args  = (args_t*) calloc(1,sizeof(args_t));
     args->argc    = argc; args->argv = argv;
-    
+
     static struct option loptions[] =
     {
         {"fai",1,0,'f'},
